@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.2)
+cmake_minimum_required (VERSION 3.8.2)
 project(imgui VERSION 1.73.0 LANGUAGES CXX C)
 
 option (IMGUI_EXAMPLES "Build ImGui examples" ON)
@@ -28,7 +28,7 @@ add_library(imgui::imgui ALIAS imgui)
 
 target_include_directories (imgui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 
-set_target_properties(imgui PROPERTIES CXX_STANDARD 11)
+target_compile_features(imgui PRIVATE cxx_std_98)
 
 if (IMGUI_EXAMPLES)
     # Sets up polyfill libraries for Windows examples (e.g. GLFW)
