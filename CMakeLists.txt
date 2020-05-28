@@ -1,5 +1,5 @@
-project (imgui)
-cmake_minimum_required (VERSION 3.2)
+cmake_minimum_required (VERSION 3.8.2)
+project(imgui VERSION 1.73.0 LANGUAGES CXX C)
 
 option (IMGUI_EXAMPLES "Build ImGui examples" ON)
 option (IMGUI_DEMO "Include the ImGui demo window implementation in library" ON)
@@ -17,20 +17,18 @@ option (IMGUI_IMPL_DX10 "Build the DirectX 10 implementation (only if supported)
 option (IMGUI_IMPL_DX11 "Build the DirectX 11 implementation (only if supported)" ${WIN32})
 option (IMGUI_IMPL_DX12 "Build the DirectX 12 implementation (only if supported)" ${WIN32})
 
-set (CMAKE_CXX_STANDARD 11)
-
-if (IMGUI_DEMO)
-    set (IMGUI_DEMO_SRC imgui_demo.cpp)
-endif ()
-
-add_library (imgui STATIC
+add_library (imgui
     imgui.cpp
     imgui_draw.cpp
     imgui_widgets.cpp
-    ${IMGUI_DEMO_SRC}
+    $<$<BOOL:IMGUI_DEMO>:imgui_demo.cpp>
 )
 
+add_library(imgui::imgui ALIAS imgui)
+
 target_include_directories (imgui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+
+target_compile_features(imgui PRIVATE cxx_std_98)
 
 if (IMGUI_EXAMPLES)
     # Sets up polyfill libraries for Windows examples (e.g. GLFW)
