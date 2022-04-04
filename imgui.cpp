@@ -4453,6 +4453,9 @@ void ImGui::NewFrame()
     g.ItemFlagsStack.push_back(ImGuiItemFlags_None);
     g.GroupStack.resize(0);
 
+    // set 'no need for refresh later' initially until one of the widgets tells otherwise
+    g.IO.NextRefresh = FLT_MAX; g.IO.SetNextRefresh(FLT_MAX, "");
+
     // [DEBUG] Update debug features
     UpdateDebugToolItemPicker();
     UpdateDebugToolStackQueries();
@@ -5877,12 +5880,18 @@ void ImGui::RenderWindowTitleBarContents(ImGuiWindow* window, const ImRect& titl
     // Collapse button (submitting first so it gets priority when choosing a navigation init fallback)
     if (has_collapse_button)
         if (CollapseButton(window->GetID("#COLLAPSE"), collapse_button_pos))
+        {
             window->WantCollapseToggle = true; // Defer actual collapsing to next frame as we are too far in the Begin() function
+            g.IO.SetNextRefresh(0, "window collapse toggled");
+        }
 
     // Close button
     if (has_close_button)
         if (CloseButton(window->GetID("#CLOSE"), close_button_pos))
+        {
             *p_open = false;
+            g.IO.SetNextRefresh(0, "window close via closebutton");
+        }
 
     window->DC.NavLayerCurrent = ImGuiNavLayer_Main;
     g.CurrentItemFlags = item_flags_backup;
@@ -6161,13 +6170,17 @@ bool ImGui::Begin(const char* name, bool* p_open, ImGuiWindowFlags flags)
 
         // Hide new windows for one frame until they calculate their size
         if (window_just_created && (!window_size_x_set_by_api || !window_size_y_set_by_api))
+        {
             window->HiddenFramesCannotSkipItems = 1;
+            g.IO.SetNextRefresh(0, "HiddenFrames JustCreated");// don't delay rendering of new frame to get hidden frames working
+        }
 
         // Hide popup/tooltip window when re-opening while we measure size (because we recycle the windows)
         // We reset Size/ContentSize for reappearing popups/tooltips early in this function, so further code won't be tempted to use the old size.
         if (window_just_activated_by_user && (flags & (ImGuiWindowFlags_Popup | ImGuiWindowFlags_Tooltip)) != 0)
         {
             window->HiddenFramesCannotSkipItems = 1;
+            g.IO.SetNextRefresh(0, "HiddenFrames JustActivated"); // don't delay rendering of new frame to get hidden frames working
             if (flags & ImGuiWindowFlags_AlwaysAutoResize)
             {
                 if (!window_size_x_set_by_api)
@@ -6669,6 +6682,15 @@ void ImGui::End()
     // Stop logging
     if (!(window->Flags & ImGuiWindowFlags_ChildWindow))    // FIXME: add more options for scope of logging
         LogFinish();
+
+    //fix against scrollbar size change: https://github.com/ocornut/imgui/pull/5116#issuecomment-1073457456
+    if ((window->ScrollbarX || window->ScrollbarY) && g.IO.NextRefresh > 0)
+    {
+        ImVec2 sizes, sizes_ideal;
+        CalcWindowContentSizes(window, &sizes, &sizes_ideal);
+        if ((window->ScrollbarX && window->ContentSize.x != sizes.x) || (window->ScrollbarY && window->ContentSize.y != sizes.y))
+            g.IO.SetNextRefresh(0, "scrollbar resize"); 
+    }
 
     // Pop from window stack
     g.LastItemData = g.CurrentWindowStack.back().ParentLastItemDataBackup;
@@ -11524,6 +11546,10 @@ void ImGui::LogButtons()
         LogToClipboard();
 }
 
+void  ImGui::SetNextRefresh(float delay_in_seconds, const char* refresh_reason)
+{
+    GetIO().SetNextRefresh(delay_in_seconds, refresh_reason);
+}
 
 //-----------------------------------------------------------------------------
 // [SECTION] SETTINGS
