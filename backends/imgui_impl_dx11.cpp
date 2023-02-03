@@ -650,6 +650,7 @@ static void ImGui_ImplDX11_CreateWindow(ImGuiViewport* viewport)
 
     IM_ASSERT(vd->SwapChain == nullptr && vd->RTView == nullptr);
     bd->pFactory->CreateSwapChain(bd->pd3dDevice, &sd, &vd->SwapChain);
+    bd->pFactory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER | DXGI_MWA_NO_PRINT_SCREEN | DXGI_MWA_NO_WINDOW_CHANGES);
 
     // Create the render target
     if (vd->SwapChain)
