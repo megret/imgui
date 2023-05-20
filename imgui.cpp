@@ -1227,6 +1227,7 @@ ImGuiIO::ImGuiIO()
     DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
 
     // Miscellaneous options
+    ConfigUseDefaultMouseCursors = false;
     MouseDrawCursor = false;
 #ifdef __APPLE__
     ConfigMacOSXBehaviors = true;  // Set Mac OS X style defaults based on __APPLE__ compile time flag
@@ -12237,7 +12238,8 @@ bool ImGui::BeginDragDropSource(ImGuiDragDropFlags flags)
 
     if (source_drag_active)
     {
-        SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+        if (g.IO.ConfigUseDefaultMouseCursors)
+            SetMouseCursor(ImGuiMouseCursor_ResizeAll);
 
         if (!g.DragDropActive)
         {

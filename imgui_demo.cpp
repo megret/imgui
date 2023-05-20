@@ -448,6 +448,8 @@ void ImGui::ShowDemoWindow(bool* p_open)
             ImGui::SameLine(); HelpMarker("Enable input queue trickling: some types of events submitted during the same frame (e.g. button down + up) will be spread over multiple frames, improving interactions with low framerates.");
             ImGui::Checkbox("io.MouseDrawCursor", &io.MouseDrawCursor);
             ImGui::SameLine(); HelpMarker("Instruct Dear ImGui to render a mouse cursor itself. Note that a mouse cursor rendered via your application GPU rendering path will feel more laggy than hardware cursor, but will be more in sync with your other visuals.\n\nSome desktop applications may use both kinds of cursors (e.g. enable software cursor only when resizing/dragging something).");
+            ImGui::Checkbox("io.ConfigUseDefaultMouseCursors", &io.ConfigUseDefaultMouseCursors);
+            ImGui::SameLine(); HelpMarker("Instruct Dear ImGui to render hand cursor for buttons, resize cursors for sliders, scrollbars and drag widgets, as well as resize-all cursor for drag & drop");
 
             ImGui::SeparatorText("Widgets");
             ImGui::Checkbox("io.ConfigInputTextCursorBlink", &io.ConfigInputTextCursorBlink);
@@ -6030,6 +6032,7 @@ void ImGui::ShowAboutWindow(bool* p_open)
         if (io.ConfigFlags & ImGuiConfigFlags_NavNoCaptureKeyboard)     ImGui::Text(" NavNoCaptureKeyboard");
         if (io.ConfigFlags & ImGuiConfigFlags_NoMouse)                  ImGui::Text(" NoMouse");
         if (io.ConfigFlags & ImGuiConfigFlags_NoMouseCursorChange)      ImGui::Text(" NoMouseCursorChange");
+        if (io.ConfigUseDefaultMouseCursors)                            ImGui::Text("io.ConfigUseDefaultMouseCursors");
         if (io.MouseDrawCursor)                                         ImGui::Text("io.MouseDrawCursor");
         if (io.ConfigMacOSXBehaviors)                                   ImGui::Text("io.ConfigMacOSXBehaviors");
         if (io.ConfigInputTextCursorBlink)                              ImGui::Text("io.ConfigInputTextCursorBlink");
