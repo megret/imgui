@@ -479,7 +479,7 @@ void ImGui::BulletTextV(const char* fmt, va_list args)
 //   Frame N + RepeatDelay + RepeatRate*N   true                     true              -                   true
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 
-bool ImGui::ButtonBehavior(const ImRect& bb, ImGuiID id, bool* out_hovered, bool* out_held, ImGuiButtonFlags flags)
+bool ImGui::ButtonBehavior(const ImRect& bb, ImGuiID id, bool* out_hovered, bool* out_held, ImGuiButtonFlags flags, ImGuiMouseCursor cursor)
 {
     ImGuiContext& g = *GImGui;
     ImGuiWindow* window = GetCurrentWindow();
@@ -598,6 +598,9 @@ bool ImGui::ButtonBehavior(const ImRect& bb, ImGuiID id, bool* out_hovered, bool
         if (pressed)
             g.NavDisableHighlight = true;
     }
+
+    if (ImGui::IsItemHovered())
+        SetMouseCursor(cursor);
 
     // Gamepad/Keyboard navigation
     // We report navigated item as hovered but we don't set g.HoveredId to not interfere with mouse.
@@ -761,7 +764,7 @@ bool ImGui::InvisibleButton(const char* str_id, const ImVec2& size_arg, ImGuiBut
         return false;
 
     bool hovered, held;
-    bool pressed = ButtonBehavior(bb, id, &hovered, &held, flags);
+    bool pressed = ButtonBehavior(bb, id, &hovered, &held, flags, ImGuiMouseCursor_Arrow); // ImGuiMouseCursor_Arrow, since this is invinsible and in most cases we don't want to show that we're using a button
 
     IMGUI_TEST_ENGINE_ITEM_INFO(id, str_id, g.LastItemData.StatusFlags);
     return pressed;
@@ -960,7 +963,7 @@ bool ImGui::ScrollbarEx(const ImRect& bb_frame, ImGuiID id, ImGuiAxis axis, ImS6
     bool held = false;
     bool hovered = false;
     ItemAdd(bb_frame, id, NULL, ImGuiItemFlags_NoNav);
-    ButtonBehavior(bb, id, &hovered, &held, ImGuiButtonFlags_NoNavFocus);
+    ButtonBehavior(bb, id, &hovered, &held, ImGuiButtonFlags_NoNavFocus, axis == ImGuiAxis_X ? ImGuiMouseCursor_ResizeEW : ImGuiMouseCursor_ResizeNS);
 
     const ImS64 scroll_max = ImMax((ImS64)1, size_contents_v - size_avail_v);
     float scroll_ratio = ImSaturate((float)*p_scroll_v / (float)scroll_max);
@@ -2358,6 +2361,10 @@ bool ImGui::DragBehavior(ImGuiID id, ImGuiDataType data_type, void* p_v, float v
     IM_ASSERT((flags == 1 || (flags & ImGuiSliderFlags_InvalidMask_) == 0) && "Invalid ImGuiSliderFlags flags! Has the 'float power' argument been mistakenly cast to flags? Call function with ImGuiSliderFlags_Logarithmic flags instead.");
 
     ImGuiContext& g = *GImGui;
+    if ((g.LastItemData.InFlags & ImGuiItemFlags_ReadOnly) || (flags & ImGuiSliderFlags_ReadOnly))
+        return false;
+    if (IsItemHovered())
+        SetMouseCursor(ImGuiMouseCursor_ResizeEW);
     if (g.ActiveId == id)
     {
         // Those are the things we can do easily outside the DragBehaviorT<> template, saves code generation.
@@ -2367,8 +2374,6 @@ bool ImGui::DragBehavior(ImGuiID id, ImGuiDataType data_type, void* p_v, float v
             ClearActiveID();
     }
     if (g.ActiveId != id)
-        return false;
-    if ((g.LastItemData.InFlags & ImGuiItemFlags_ReadOnly) || (flags & ImGuiSliderFlags_ReadOnly))
         return false;
 
     switch (data_type)
@@ -2951,6 +2956,13 @@ bool ImGui::SliderBehavior(const ImRect& bb, ImGuiID id, ImGuiDataType data_type
     ImGuiContext& g = *GImGui;
     if ((g.LastItemData.InFlags & ImGuiItemFlags_ReadOnly) || (flags & ImGuiSliderFlags_ReadOnly))
         return false;
+    if (IsItemHovered())
+    {
+        if ((g.LastItemData.InFlags & ImGuiSliderFlags_Vertical) || (flags & ImGuiSliderFlags_Vertical))
+            SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+        else
+            SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+    }
 
     switch (data_type)
     {
