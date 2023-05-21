@@ -2361,7 +2361,7 @@ bool ImGui::DragBehavior(ImGuiID id, ImGuiDataType data_type, void* p_v, float v
     IM_ASSERT((flags == 1 || (flags & ImGuiSliderFlags_InvalidMask_) == 0) && "Invalid ImGuiSliderFlags flags! Has the 'float power' argument been mistakenly cast to flags? Call function with ImGuiSliderFlags_Logarithmic flags instead.");
 
     ImGuiContext& g = *GImGui;
-    if ((g.LastItemData.InFlags & ImGuiItemFlags_ReadOnly) || (flags & ImGuiSliderFlags_ReadOnly))
+    if ((g.LastItemData.InFlags | flags) & ImGuiSliderFlags_ReadOnly)
         return false;
     if (g.IO.ConfigUseDefaultMouseCursors && IsItemHovered())
         SetMouseCursor(ImGuiMouseCursor_ResizeEW);
@@ -2954,11 +2954,11 @@ bool ImGui::SliderBehavior(const ImRect& bb, ImGuiID id, ImGuiDataType data_type
 
     // Those are the things we can do easily outside the SliderBehaviorT<> template, saves code generation.
     ImGuiContext& g = *GImGui;
-    if ((g.LastItemData.InFlags & ImGuiItemFlags_ReadOnly) || (flags & ImGuiSliderFlags_ReadOnly))
+    if ((g.LastItemData.InFlags | ImGuiSliderFlags_ReadOnly) & ImGuiItemFlags_ReadOnly)
         return false;
     if (g.IO.ConfigUseDefaultMouseCursors && IsItemHovered())
     {
-        if ((g.LastItemData.InFlags & ImGuiSliderFlags_Vertical) || (flags & ImGuiSliderFlags_Vertical))
+        if ((g.LastItemData.InFlags | flags) & ImGuiSliderFlags_Vertical)
             SetMouseCursor(ImGuiMouseCursor_ResizeNS);
         else
             SetMouseCursor(ImGuiMouseCursor_ResizeEW);
