@@ -479,7 +479,7 @@ void ImGui::BulletTextV(const char* fmt, va_list args)
 //   Frame N + RepeatDelay + RepeatRate*N   true                     true              -                   true
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 
-bool ImGui::ButtonBehavior(const ImRect& bb, ImGuiID id, bool* out_hovered, bool* out_held, ImGuiButtonFlags flags, ImGuiMouseCursor cursor)
+bool ImGui::ButtonBehavior(const ImRect& bb, ImGuiID id, bool* out_hovered, bool* out_held, ImGuiButtonFlags flags)
 {
     ImGuiContext& g = *GImGui;
     ImGuiWindow* window = GetCurrentWindow();
@@ -599,9 +599,6 @@ bool ImGui::ButtonBehavior(const ImRect& bb, ImGuiID id, bool* out_hovered, bool
             g.NavDisableHighlight = true;
     }
 
-    if (g.IO.ConfigUseDefaultMouseCursors && ImGui::IsItemHovered())
-        SetMouseCursor(cursor);
-
     // Gamepad/Keyboard navigation
     // We report navigated item as hovered but we don't set g.HoveredId to not interfere with mouse.
     if (g.NavId == id && !g.NavDisableHighlight && g.NavDisableMouseHover && (g.ActiveId == 0 || g.ActiveId == id || g.ActiveId == window->MoveId))
@@ -710,6 +707,8 @@ bool ImGui::ButtonEx(const char* label, const ImVec2& size_arg, ImGuiButtonFlags
 
     bool hovered, held;
     bool pressed = ButtonBehavior(bb, id, &hovered, &held, flags);
+    if (g.IO.ConfigUseDefaultMouseCursors && hovered)
+        SetMouseCursor(ImGuiMouseCursor_Hand);
 
     // Render
     const ImU32 col = GetColorU32((held && hovered) ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
@@ -764,7 +763,7 @@ bool ImGui::InvisibleButton(const char* str_id, const ImVec2& size_arg, ImGuiBut
         return false;
 
     bool hovered, held;
-    bool pressed = ButtonBehavior(bb, id, &hovered, &held, flags, ImGuiMouseCursor_Arrow); // ImGuiMouseCursor_Arrow, since this is invinsible and in most cases we don't want to show that we're using a button
+    bool pressed = ButtonBehavior(bb, id, &hovered, &held, flags); // Don't set a mouse cursor here, since this button is invisible and not used as a regular button most of the time
 
     IMGUI_TEST_ENGINE_ITEM_INFO(id, str_id, g.LastItemData.StatusFlags);
     return pressed;
@@ -789,6 +788,8 @@ bool ImGui::ArrowButtonEx(const char* str_id, ImGuiDir dir, ImVec2 size, ImGuiBu
 
     bool hovered, held;
     bool pressed = ButtonBehavior(bb, id, &hovered, &held, flags);
+    if (g.IO.ConfigUseDefaultMouseCursors && hovered)
+        SetMouseCursor(ImGuiMouseCursor_Hand);
 
     // Render
     const ImU32 bg_col = GetColorU32((held && hovered) ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
@@ -827,6 +828,8 @@ bool ImGui::CloseButton(ImGuiID id, const ImVec2& pos)
 
     bool hovered, held;
     bool pressed = ButtonBehavior(bb_interact, id, &hovered, &held);
+    if (g.IO.ConfigUseDefaultMouseCursors && hovered)
+        SetMouseCursor(ImGuiMouseCursor_Hand);
     if (is_clipped)
         return pressed;
 
@@ -855,6 +858,8 @@ bool ImGui::CollapseButton(ImGuiID id, const ImVec2& pos)
     ItemAdd(bb, id);
     bool hovered, held;
     bool pressed = ButtonBehavior(bb, id, &hovered, &held, ImGuiButtonFlags_None);
+    if (g.IO.ConfigUseDefaultMouseCursors && hovered)
+        SetMouseCursor(ImGuiMouseCursor_Hand);
 
     // Render
     ImU32 bg_col = GetColorU32((held && hovered) ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
@@ -963,7 +968,9 @@ bool ImGui::ScrollbarEx(const ImRect& bb_frame, ImGuiID id, ImGuiAxis axis, ImS6
     bool held = false;
     bool hovered = false;
     ItemAdd(bb_frame, id, NULL, ImGuiItemFlags_NoNav);
-    ButtonBehavior(bb, id, &hovered, &held, ImGuiButtonFlags_NoNavFocus, axis == ImGuiAxis_X ? ImGuiMouseCursor_ResizeEW : ImGuiMouseCursor_ResizeNS);
+    ButtonBehavior(bb, id, &hovered, &held, ImGuiButtonFlags_NoNavFocus);
+    if (g.IO.ConfigUseDefaultMouseCursors && hovered)
+        SetMouseCursor(axis == ImGuiAxis_X ? ImGuiMouseCursor_ResizeEW : ImGuiMouseCursor_ResizeNS);
 
     const ImS64 scroll_max = ImMax((ImS64)1, size_contents_v - size_avail_v);
     float scroll_ratio = ImSaturate((float)*p_scroll_v / (float)scroll_max);
@@ -1057,6 +1064,8 @@ bool ImGui::ImageButtonEx(ImGuiID id, ImTextureID texture_id, const ImVec2& size
 
     bool hovered, held;
     bool pressed = ButtonBehavior(bb, id, &hovered, &held, flags);
+    if (g.IO.ConfigUseDefaultMouseCursors && hovered)
+        SetMouseCursor(ImGuiMouseCursor_Hand);
 
     // Render
     const ImU32 col = GetColorU32((held && hovered) ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
@@ -1128,6 +1137,8 @@ bool ImGui::Checkbox(const char* label, bool* v)
 
     bool hovered, held;
     bool pressed = ButtonBehavior(total_bb, id, &hovered, &held);
+    if (g.IO.ConfigUseDefaultMouseCursors && hovered)
+        SetMouseCursor(ImGuiMouseCursor_Hand);
     if (pressed)
     {
         *v = !(*v);
@@ -1237,6 +1248,8 @@ bool ImGui::RadioButton(const char* label, bool active)
 
     bool hovered, held;
     bool pressed = ButtonBehavior(total_bb, id, &hovered, &held);
+    if (g.IO.ConfigUseDefaultMouseCursors && hovered)
+        SetMouseCursor(ImGuiMouseCursor_Hand);
     if (pressed)
         MarkItemEdited(id);
 
@@ -1703,6 +1716,9 @@ bool ImGui::BeginCombo(const char* label, const char* preview_value, ImGuiComboF
     // Open on click
     bool hovered, held;
     bool pressed = ButtonBehavior(bb, id, &hovered, &held);
+    if (g.IO.ConfigUseDefaultMouseCursors && hovered)
+        SetMouseCursor(ImGuiMouseCursor_Hand);
+
     const ImGuiID popup_id = ImHashStr("##ComboPopup", 0, id);
     bool popup_open = IsPopupOpen(popup_id, ImGuiPopupFlags_None);
     if (pressed && !popup_open)
@@ -2363,7 +2379,7 @@ bool ImGui::DragBehavior(ImGuiID id, ImGuiDataType data_type, void* p_v, float v
     ImGuiContext& g = *GImGui;
     if ((g.LastItemData.InFlags | flags) & ImGuiSliderFlags_ReadOnly)
         return false;
-    if (g.IO.ConfigUseDefaultMouseCursors && IsItemHovered())
+    if (g.IO.ConfigUseDefaultMouseCursors && g.HoveredId == id)
         SetMouseCursor(ImGuiMouseCursor_ResizeEW);
     if (g.ActiveId == id)
     {
@@ -2956,7 +2972,7 @@ bool ImGui::SliderBehavior(const ImRect& bb, ImGuiID id, ImGuiDataType data_type
     ImGuiContext& g = *GImGui;
     if ((g.LastItemData.InFlags | ImGuiSliderFlags_ReadOnly) & ImGuiItemFlags_ReadOnly)
         return false;
-    if (g.IO.ConfigUseDefaultMouseCursors && IsItemHovered())
+    if (g.IO.ConfigUseDefaultMouseCursors && g.HoveredId == id)
     {
         if ((g.LastItemData.InFlags | flags) & ImGuiSliderFlags_Vertical)
             SetMouseCursor(ImGuiMouseCursor_ResizeNS);
@@ -5756,6 +5772,8 @@ bool ImGui::ColorButton(const char* desc_id, const ImVec4& col, ImGuiColorEditFl
 
     bool hovered, held;
     bool pressed = ButtonBehavior(bb, id, &hovered, &held);
+    if (g.IO.ConfigUseDefaultMouseCursors && hovered)
+        SetMouseCursor(ImGuiMouseCursor_Hand);
 
     if (flags & ImGuiColorEditFlags_NoAlpha)
         flags &= ~(ImGuiColorEditFlags_AlphaPreview | ImGuiColorEditFlags_AlphaPreviewHalf);
@@ -6213,6 +6231,9 @@ bool ImGui::TreeNodeBehavior(ImGuiID id, ImGuiTreeNodeFlags flags, const char* l
 
     bool hovered, held;
     bool pressed = ButtonBehavior(interact_bb, id, &hovered, &held, button_flags);
+    if (g.IO.ConfigUseDefaultMouseCursors && hovered)
+        SetMouseCursor(ImGuiMouseCursor_Hand);
+
     bool toggled = false;
     if (!is_leaf)
     {
@@ -6515,6 +6536,8 @@ bool ImGui::Selectable(const char* label, bool selected, ImGuiSelectableFlags fl
     const bool was_selected = selected;
     bool hovered, held;
     bool pressed = ButtonBehavior(bb, id, &hovered, &held, button_flags);
+    if (g.IO.ConfigUseDefaultMouseCursors && hovered)
+        SetMouseCursor(ImGuiMouseCursor_Hand);
 
     // Auto-select when moved into
     // - This will be more fully fleshed in the range-select branch
@@ -8415,6 +8438,8 @@ bool    ImGui::TabItemEx(ImGuiTabBar* tab_bar, const char* label, bool* p_open, 
         button_flags |= ImGuiButtonFlags_PressedOnDragDropHold;
     bool hovered, held;
     bool pressed = ButtonBehavior(bb, id, &hovered, &held, button_flags);
+    if (g.IO.ConfigUseDefaultMouseCursors && hovered)
+        SetMouseCursor(ImGuiMouseCursor_Hand);
     if (pressed && !is_tab_button)
         TabBarQueueFocus(tab_bar, tab);
 
