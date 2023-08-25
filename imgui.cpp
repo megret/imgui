@@ -1266,6 +1266,7 @@ ImGuiIO::ImGuiIO()
     KeyRepeatRate = 0.050f;
 
     // Miscellaneous options
+    ConfigUseDefaultMouseCursors = false;
     MouseDrawCursor = false;
 #ifdef __APPLE__
     ConfigMacOSXBehaviors = true;  // Set Mac OS X style defaults based on __APPLE__ compile time flag
@@ -12416,6 +12417,9 @@ bool ImGui::BeginDragDropSource(ImGuiDragDropFlags flags)
 
     if (source_drag_active)
     {
+        if (g.IO.ConfigUseDefaultMouseCursors)
+            SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+
         if (!g.DragDropActive)
         {
             IM_ASSERT(source_id != 0);
