@@ -4779,6 +4779,7 @@ static void SetupDrawListSharedData()
         g.DrawListSharedData.InitialFlags |= ImDrawListFlags_LegacyPolyline;
     if (g.IO.BackendFlags & ImGuiBackendFlags_RendererHasVtxOffset)
         g.DrawListSharedData.InitialFlags |= ImDrawListFlags_AllowVtxOffset;
+    g.DrawListSharedData.InitialFringeScale = g.IO.DisplayFramebufferScale.x ? 1.0f / g.IO.DisplayFramebufferScale.x : 1.0f;
 }
 
 void ImGui::NewFrame()
