@@ -132,6 +132,7 @@ struct ImGuiContext;                // Main Dear ImGui context
 struct ImGuiContextHook;            // Hook for extensions like ImGuiTestEngine
 struct ImGuiDataVarInfo;            // Variable information (e.g. to access style variables from an enum)
 struct ImGuiDataTypeInfo;           // Type information associated to a ImGuiDataType enum
+struct ImGuiErrorRecoveryState;     // Storage of stack sizes for error handling and recovery
 struct ImGuiGroupData;              // Stacked storage data for BeginGroup()/EndGroup()
 struct ImGuiInputTextState;         // Internal state of the currently focused/edited text input box
 struct ImGuiInputTextDeactivateData;// Short term storage to backup text of a deactivating InputText() while another is stealing active id
@@ -148,7 +149,6 @@ struct ImGuiOldColumnData;          // Storage data for a single column for lega
 struct ImGuiOldColumns;             // Storage data for a columns set for legacy Columns() api
 struct ImGuiPopupData;              // Storage for current popup stack
 struct ImGuiSettingsHandler;        // Storage for one type registered in the .ini file
-struct ImGuiStackSizes;             // Storage of stack sizes for debugging/asserting
 struct ImGuiStyleMod;               // Stacked style modifier, backup of modified data so we can restore it
 struct ImGuiTabBar;                 // Storage for a tab bar
 struct ImGuiTabItem;                // Storage for a tab item (within a tab bar)
@@ -174,6 +174,7 @@ typedef int ImGuiLayoutType;            // -> enum ImGuiLayoutType_         // E
 // Flags
 typedef int ImGuiActivateFlags;         // -> enum ImGuiActivateFlags_      // Flags: for navigation/focus function (will be for ActivateItem() later)
 typedef int ImGuiDebugLogFlags;         // -> enum ImGuiDebugLogFlags_      // Flags: for ShowDebugLogWindow(), g.DebugLogFlags
+typedef int ImGuiErrorFlags;            // -> enum ImGuiErrorFlags_         // Flags: for IM_ASSERT_USER_ERROR(), g.ErrorFlags
 typedef int ImGuiFocusRequestFlags;     // -> enum ImGuiFocusRequestFlags_  // Flags: for FocusWindow()
 typedef int ImGuiItemStatusFlags;       // -> enum ImGuiItemStatusFlags_    // Flags: for g.LastItemData.StatusFlags
 typedef int ImGuiOldColumnFlags;        // -> enum ImGuiOldColumnFlags_     // Flags: for BeginColumns()
@@ -1253,9 +1254,10 @@ struct ImGuiTreeNodeStackData
     ImRect                  NavRect;    // Used for nav landing
 };
 
-// sizeof() = 18
-struct IMGUI_API ImGuiStackSizes
+// sizeof() = 20
+struct IMGUI_API ImGuiErrorRecoveryState
 {
+    short   SizeOfWindowStack;
     short   SizeOfIDStack;
     short   SizeOfColorStack;
     short   SizeOfStyleVarStack;
@@ -1266,18 +1268,16 @@ struct IMGUI_API ImGuiStackSizes
     short   SizeOfBeginPopupStack;
     short   SizeOfDisabledStack;
 
-    ImGuiStackSizes() { memset(this, 0, sizeof(*this)); }
-    void SetToContextState(ImGuiContext* ctx);
-    void CompareWithContextState(ImGuiContext* ctx);
+    ImGuiErrorRecoveryState() { memset(this, 0, sizeof(*this)); }
 };
 
 // Data saved for each window pushed into the stack
 struct ImGuiWindowStackData
 {
-    ImGuiWindow*        Window;
-    ImGuiLastItemData   ParentLastItemDataBackup;
-    ImGuiStackSizes     StackSizesOnBegin;          // Store size of various stacks for asserting
-    bool                DisabledOverrideReenable;   // Non-child window override disabled flag
+    ImGuiWindow*            Window;
+    ImGuiLastItemData       ParentLastItemDataBackup;
+    ImGuiErrorRecoveryState StackSizesInBegin;          // Store size of various stacks for asserting
+    bool                    DisabledOverrideReenable;   // Non-child window override disabled flag
 };
 
 struct ImGuiShrinkWidthItem
@@ -1885,12 +1885,51 @@ struct ImGuiLocEntry
 //-----------------------------------------------------------------------------
 
 // Macros used by Recoverable Error handling
-// Down the line in some frameworks/languages we would like to have a way to redirect those to the programmer and recover from more faults.
+// - Only dispatch error if _EXPR: evaluate as assert (similar to an assert macro).
+// - The message will always be a string literal, in order to increase likelihood of being display by an assert handler.
+// - The intent is that you may rewire this macro to dispatch dynamically:
+//   - On programmers machines, when debugger is attached, on direct imgui API usage error: always assert!
+//   - On exception recovery and script language recovery: you may decide to error log.
 #ifndef IM_ASSERT_USER_ERROR
-#define IM_ASSERT_USER_ERROR(_EXPR,_MSG)    IM_ASSERT((_EXPR) && _MSG)
+#define IM_ASSERT_USER_ERROR(_EXPR,_MSG)    do { if (!(_EXPR) && ImGui::ErrorLog(_MSG)) { IM_ASSERT((_EXPR) && _MSG); } } while (0)    // Recoverable User Error
 #endif
 
-typedef void (*ImGuiErrorLogCallback)(void* user_data, const char* fmt, ...);
+// - Error recovery is provided as a way to facilitate recovery from errors in e.g. scripting languages, or after specific exceptions handlers.
+// - Error recovery is not perfect nor guaranteed! You are not supposed to rely on it in the course of a normal application run.
+// - Always ensure that on programmers seat you have at minimum Asserts or Tooltips enabled when making direct imgui API call,
+//   and especially in native code. Otherwise it would severely hinder your ability to catch and correct mistakes!
+// - (1) Programmer seats: default path is:
+//   - Recoverable errors will call IM_ASSERT_USER_ERROR(), leading to IM_ASSERT() being executed.
+//   - Recovery will generally be performed, assuming you can resume from your assert.
+// - (2) Programmer seats: if you disable Asserts (either via ImGuiErrorFlags_NoAssert either via a disabled IM_ASSERT macros) but keep Tooltips:
+//   - Recoverable errors will be visible in a tooltip.
+//   - Programmer is prompted to press F1 to enable asserts.
+//   - THIS IMPLICITLY RELY ON RECOVERY BEING 100% FUNCTIONAL WHICH IS NOT GUARANTEED. A FEW CASES MIGHT PROBABLY STILL CRASH/ASSERTS.
+//   - THIS IMPLICITLY RELY ON 'F1' KEY BEING AVAILABLE WITHOUT CAUSING MUCH HARM IN YOUR APP. // FIXME-ERRORHANDLING: Need to find a solution for this.
+// - (3) What you might want to setup on non-programmers seats:
+//   - Use ImGuiErrorFlags_NoAssert, but make sure log entries are well visible or reported somewhere.
+//   - If errors are not well resurfaced to programmers, it may hinder your ability to prevent errors from staying/spreading in the codebase. Use with caution!
+// - (4) If you offer the ability to write Dear ImGui code via e.g. scripting language, you may want to:
+//   - Use ErrorRecoveryStoreState() to record stack sizes before running the script interpreter.
+//   - Use ImGuiErrorFlags_NoAssert but only while in the context of the script interpreter.
+//   - Maybe trigger a script break from your ErrorCallback if you can.
+//   - Ensure that e.g ImGuiErrorFlags_NoTooltip is NOT set, and that log entries are well surfaced and visible somewhere.
+// - (5) To handle resuming code execution after an exception:
+//   - Use ErrorRecoveryStoreState() to record stack sizes before your try {} block.
+//   - Temporary adjust settings (e.g. disable assert, set a log callback).
+//   - Call ErrorRecoveryTryToRecoverState()
+//   - Restore settings.
+// FIXME-ERRORHANDLING: recover may log many times and assert once?
+enum ImGuiErrorFlags_
+{
+    ImGuiErrorFlags_None                = 0,
+    ImGuiErrorFlags_EnableRecovery      = 1 << 0,   // Enable recovery attempts. Some errors won't be detected and lead to direct crashes if recovery is disabled.
+    ImGuiErrorFlags_NoDebugLog          = 1 << 1,   // Disable debug log on error.
+    ImGuiErrorFlags_NoAssert            = 1 << 2,   // Disable asserts on error. Otherwise: we call IM_ASSERT() when returning from a failing IM_ASSERT_USER_ERROR()
+    ImGuiErrorFlags_NoTooltip           = 1 << 3,   // Disable tooltip on error. The tooltip will display a keyboard shortcut to enable asserts if they were disabled!
+};
+
+typedef void (*ImGuiErrorCallback)(ImGuiContext* ctx, void* user_data, const char* msg);
 
 //-----------------------------------------------------------------------------
 // [SECTION] Metrics, Debug Tools
@@ -2313,8 +2352,16 @@ struct ImGuiContext
     int                     LogDepthToExpand;
     int                     LogDepthToExpandDefault;            // Default/stored value for LogDepthMaxExpand if not specified in the LogXXX function call.
 
-    // Error handling
+    // Error Handling [EXPERIMENTAL]
+    // (this will eventually be moved to public ImGuiIO when we are happy with the feature)
+    ImGuiErrorFlags         ErrorFlags;                             // = Assert+DebugLog+Tooltip. See ImGuiErrorHandlingFlags_
+    ImGuiErrorCallback      ErrorCallback;                          // = NULL
+    void*                   ErrorCallbackUserData;                  // = NULL
     ImVec2                  ErrorTooltipLockedPos;
+    bool                    ErrorFirst;
+    int                     ErrorCountCurrentFrame;                 // [Internal] Number of errors submitted this frame.
+    ImGuiErrorRecoveryState StackSizesInNewFrame;                   // [Internal]
+    ImGuiErrorRecoveryState*StackSizesInBeginForCurrentWindow;      // [Internal]
 
     // Debug Tools
     // (some of the highly frequently used data are interleaved in other structures above: DebugBreakXXX fields, DebugHookIdInfo, DebugLocateId etc.)
@@ -3419,9 +3466,11 @@ namespace ImGui
     IMGUI_API void          GcAwakeTransientWindowBuffers(ImGuiWindow* window);
 
     // Error handling, State Recovery
+    IMGUI_API bool          ErrorLog(const char* msg);
+    IMGUI_API void          ErrorRecoveryStoreState(ImGuiErrorRecoveryState* state_out);
+    IMGUI_API void          ErrorRecoveryTryToRecoverState(const ImGuiErrorRecoveryState* state_in);
+    IMGUI_API void          ErrorRecoveryTryToRecoverWindowState(const ImGuiErrorRecoveryState* state_in);
     IMGUI_API void          ErrorCheckUsingSetCursorPosToExtendParentBoundaries();
-    IMGUI_API void          ErrorCheckEndFrameRecover();
-    IMGUI_API void          ErrorCheckEndWindowRecover();
     IMGUI_API void          ErrorCheckEndFrameFinalizeErrorTooltip();
     IMGUI_API bool          BeginErrorTooltip();
     IMGUI_API void          EndErrorTooltip();
